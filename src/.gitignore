@@ -1,0 +1,10 @@
+.venv_gcn/
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+models/*.joblib
+models/*.pt
+models/*.pth
+output_pose_videos/
+*.h264.mp4
