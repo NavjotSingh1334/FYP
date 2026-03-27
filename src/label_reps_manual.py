@@ -1,37 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""
-COMPREHENSIVE REP LABELING TOOL
-===============================
-Edits ONE canonical labels file (Option B):
-    rep_level/rep_labels_manual_no_reject.csv
 
-Also creates regular backups before each save in:
-    rep_level/backups/
-
-Controls:
-  LABELING MODE:
-    S = Safe
-    R = Risky
-    1 = Reject (not a squat)
-    2 = Reject (bad camera angle)
-    3 = Reject (low visibility)
-    M = Manual segment this video
-    N = Skip this rep
-    Q = Quit and save
-
-  MANUAL SEGMENTATION MODE:
-    SPACE = Pause/Play
-    LEFT/RIGHT = Skip 30 frames (fallback: A/D or J/L)
-    [ = Mark rep START
-    ] = Mark rep END
-    U = Undo last rep
-    ENTER or P = Done segmenting
-    Q = Cancel and go back
-
-Usage:
-    python label_reps_comprehensive.py
-"""
 
 import os
 import re
@@ -42,28 +11,28 @@ from datetime import datetime
 from collections import defaultdict
 from InquirerPy import inquirer
 
-# ===================== CONFIG =====================
-SEGMENTED_FOLDER = "segmented_reps"
-SOURCE_VIDEOS_FOLDER = "output_pose_videos"  # For manual segmentation
 
-# ✅ OPTION B: single source of truth for training
+SEGMENTED_FOLDER = "segmented_reps"
+SOURCE_VIDEOS_FOLDER = "output_pose_videos" 
+
+
 LABELS_CSV = os.path.join("rep_level", "rep_labels_merged.csv")
-LABELS_OUTPUT_CSV = LABELS_CSV  # <-- write back to the same file
+LABELS_OUTPUT_CSV = LABELS_CSV 
 
 MATCH_REPORT_CSV = os.path.join("rep_level", "label_match_report.csv")
 
-# Backups
+
 BACKUP_DIR = os.path.join("rep_level", "backups")
-MAX_BACKUPS = 50  # keep newest 50 backups
+MAX_BACKUPS = 50  
 
 DISPLAY_MAX_W = 1280
 DISPLAY_MAX_H = 800
 FRAME_SKIP = 30
-# ==================================================
+
 
 
 def resize_to_fit(frame, max_w, max_h):
-    """Resize frame to fit within max dimensions."""
+    
     h, w = frame.shape[:2]
     scale = min(max_w / w, max_h / h)
     if scale >= 1:
@@ -74,10 +43,7 @@ def resize_to_fit(frame, max_w, max_h):
 
 
 def parse_rep_filename(filename):
-    """
-    Parse segmented rep filename.
-    e.g., 'SomeVideo_rep00.mp4' -> ('SomeVideo.mp4', 0)
-    """
+    
     match = re.match(r'(.+)_rep(\d+)\.(\w+)$', filename)
     if match:
         base_name = match.group(1)
@@ -89,19 +55,19 @@ def parse_rep_filename(filename):
 
 
 def get_source_video_path(source_file):
-    """Find the source video for manual segmentation."""
-    # Try with pose_ prefix
+   
+
     pose_name = f"pose_{source_file}"
     pose_path = os.path.join(SOURCE_VIDEOS_FOLDER, pose_name)
     if os.path.exists(pose_path):
         return pose_path
 
-    # Try without pose_ prefix
+  
     direct_path = os.path.join(SOURCE_VIDEOS_FOLDER, source_file)
     if os.path.exists(direct_path):
         return direct_path
 
-    # Try in all_videos
+   
     all_videos_path = os.path.join("all_videos", source_file)
     if os.path.exists(all_videos_path):
         return all_videos_path
@@ -109,24 +75,21 @@ def get_source_video_path(source_file):
     return None
 
 
-# ---------- Robust key handling (fixes arrow key issues) ----------
+
 def wait_key(paused: bool, play_delay_ms: int) -> int:
-    """
-    Uses waitKeyEx() to preserve special keys.
-    When paused: wait indefinitely so keys ALWAYS register.
-    """
+    
     if paused:
         return cv2.waitKeyEx(0)
     return cv2.waitKeyEx(play_delay_ms)
 
 
 def is_left(key: int) -> bool:
-    # Common: Windows OpenCV = 2424832
+   
     return key in (2424832, 81)
 
 
 def is_right(key: int) -> bool:
-    # Common: Windows OpenCV = 2555904
+    
     return key in (2555904, 83)
 
 
@@ -134,23 +97,20 @@ def key_to_char(key: int) -> str:
     if 0 <= key <= 255:
         return chr(key).lower()
     return ""
-# ---------------------------------------------------------------
+
 
 
 def manual_segment_video(source_file):
-    """
-    Manually segment a video into reps.
-    Returns list of (start_frame, end_frame) tuples, or None if cancelled / no segments.
-    """
+    
     video_path = get_source_video_path(source_file)
 
     if not video_path:
-        print(f"❌ Source video not found for: {source_file}")
+        print(f" Source video not found for: {source_file}")
         return None
 
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
-        print(f"❌ Cannot open video: {video_path}")
+        print(f" Cannot open video: {video_path}")
         return None
 
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) or 0
@@ -198,7 +158,7 @@ def manual_segment_video(source_file):
         cv2.putText(disp, "SPACE Play/Pause | [ START | ] END | U Undo | ENTER/P Done | Q Cancel",
                     (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
 
-        # Timeline
+       
         h, w = disp.shape[:2]
         bar_y = h - 40
         bar_x0, bar_x1 = 50, w - 50
@@ -224,18 +184,18 @@ def manual_segment_video(source_file):
         key = wait_key(paused, play_delay)
         ch = key_to_char(key)
 
-        # window closed
+        
         if cv2.getWindowProperty(win_name, cv2.WND_PROP_VISIBLE) < 1:
             cap.release()
             return None
 
-        # auto-advance
+      
         if not paused:
             current_frame += 1
             if total_frames > 0 and current_frame >= total_frames:
                 current_frame = 0
 
-        # controls
+        
         if ch == " ":
             paused = not paused
 
@@ -265,7 +225,7 @@ def manual_segment_video(source_file):
             else:
                 print("   ⚠️ Nothing to undo")
 
-        # Done (ENTER or P)
+        
         elif ch in ("\r", "\n", "p"):
             cap.release()
             cv2.destroyWindow(win_name)
@@ -283,7 +243,7 @@ def manual_segment_video(source_file):
 
 
 def extract_segment_to_file(source_file, start_frame, end_frame, rep_id):
-    """Extract a segment from source video and save as rep file."""
+    
     video_path = get_source_video_path(source_file)
     if not video_path:
         return None
@@ -316,7 +276,7 @@ def extract_segment_to_file(source_file, start_frame, end_frame, rep_id):
 
 
 def delete_old_reps(source_file):
-    """Delete existing rep files for a source video."""
+    
     base_name = os.path.splitext(source_file)[0]
     deleted = []
     for f in os.listdir(SEGMENTED_FOLDER):
@@ -328,10 +288,7 @@ def delete_old_reps(source_file):
 
 
 def label_single_rep(rep_video_path, source_file, rep_id, remaining_count):
-    """
-    Label a single rep video.
-    Returns: 'safe' / 'risky' / 'reject:...' / 'skip' / 'manual' / 'quit'
-    """
+
     cap = cv2.VideoCapture(rep_video_path)
     if not cap.isOpened():
         print(f"❌ Cannot open: {rep_video_path}")
@@ -383,7 +340,7 @@ def label_single_rep(rep_video_path, source_file, rep_id, remaining_count):
 
 
 def load_labels():
-    """Load existing labels (single source of truth)."""
+    
     if os.path.exists(LABELS_CSV):
         df = pd.read_csv(LABELS_CSV)
         return df
@@ -391,7 +348,7 @@ def load_labels():
 
 
 def _make_backup_if_exists(target_csv: str):
-    """Backup existing CSV before overwriting."""
+    
     if not os.path.exists(target_csv):
         return
 
@@ -402,7 +359,7 @@ def _make_backup_if_exists(target_csv: str):
 
     shutil.copy2(target_csv, backup_path)
 
-    # prune old backups
+   
     backups = sorted(
         [os.path.join(BACKUP_DIR, f) for f in os.listdir(BACKUP_DIR) if f.startswith(base + "_backup_") and f.endswith(".csv")]
     )
@@ -415,7 +372,7 @@ def _make_backup_if_exists(target_csv: str):
 
 
 def save_labels(df):
-    """Save labels to the canonical CSV (with backup + atomic write)."""
+    
     os.makedirs(os.path.dirname(LABELS_OUTPUT_CSV), exist_ok=True)
 
     keep_cols = ["file", "rep_id", "rep_video", "label", "reject_reason"]
@@ -423,13 +380,13 @@ def save_labels(df):
         if col not in df.columns:
             df[col] = ""
 
-    # latest decision wins per (file, rep_id)
+
     df = df[keep_cols].drop_duplicates(subset=["file", "rep_id"], keep="last")
 
-    # backup previous state
+
     _make_backup_if_exists(LABELS_OUTPUT_CSV)
 
-    # atomic write
+   
     tmp_path = LABELS_OUTPUT_CSV + ".tmp"
     df.to_csv(tmp_path, index=False)
     os.replace(tmp_path, LABELS_OUTPUT_CSV)
@@ -448,12 +405,12 @@ def main():
 
     df_labels = load_labels()
 
-    # Ensure required columns exist
+   
     for col in ["file", "rep_id", "rep_video", "label", "reject_reason"]:
         if col not in df_labels.columns:
             df_labels[col] = ""
 
-    # Build labeled key set
+   
     labeled_keys = set(zip(df_labels["file"].astype(str), df_labels["rep_id"].astype(int))) if len(df_labels) else set()
 
     print(f"\n📄 Existing labels (from canonical CSV): {len(df_labels)}")
@@ -572,7 +529,7 @@ def main():
                 idx += 1
             continue
 
-        # Save label
+      
         if result.startswith("reject:"):
             reject_reason = result.split(":", 1)[1]
             new_row = {
@@ -595,7 +552,7 @@ def main():
         labeled_count += 1
         idx += 1
 
-        # Auto-save every 10 labels (each save makes a backup too)
+   
         if labeled_count % 10 == 0:
             save_labels(df_labels)
 
